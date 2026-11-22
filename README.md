@@ -4,6 +4,11 @@
 
 **不需要 Obsidian。** 一个进程搞定：微信里发给 ClawBot 的文字、图片、语音、文件、公众号链接，自动落成 Markdown 存到本地，再自动上传到 OneDrive 你指定的任意文件夹。
 
+> **这个项目建立在两位原作者的工作之上。**
+> 微信侧的协议实现思路来自 [**@nextcaicai**](https://github.com/nextcaicai) 的 [**WXLink**](https://github.com/nextcaicai/WXLink)，
+> OneDrive 侧的同步与授权思路来自 [**@jiaoyingxing**](https://github.com/jiaoyingxing) 的 [**EasySync**](https://github.com/jiaoyingxing/easy-sync)。
+> 没有这两个插件，就没有 wxcollector。详见 [致谢](#致谢)。
+
 ```
 微信 ClawBot
     ↓  iLink 官方协议（长轮询）
@@ -16,7 +21,7 @@ wxcollector
 
 ## 它解决什么问题
 
-WXLink 的思路是对的（微信消息落成本地 Markdown），但它跑在 Obsidian 里：必须开着 Obsidian、只能写 vault、云端路径被 EasySync 限制在 `应用/EasySync/vaults/<仓库名>/files/` 下。
+[WXLink](https://github.com/nextcaicai/WXLink)（作者 [@nextcaicai](https://github.com/nextcaicai)）的思路是对的——微信消息落成本地 Markdown。但它跑在 Obsidian 里：必须开着 Obsidian、只能写 vault，云端路径又被 [EasySync](https://github.com/jiaoyingxing/easy-sync)（作者 [@jiaoyingxing](https://github.com/jiaoyingxing)）限制在 `应用/EasySync/vaults/<仓库名>/files/` 下。
 
 这个程序把那层壳去掉，直接用 iLink 协议 + Graph API：
 
@@ -229,6 +234,9 @@ scripts/          一次性工具（迁移/清理，默认干跑）
 ├── migrate_flat_layout.py   旧嵌套结构 → 平铺结构
 ├── migrate_old_articles.py  修复历史文章元数据
 └── sync_flat.ts             同步平铺结构到 OneDrive 并清理远端旧目录
+
+LICENSE           MIT
+README.md         本文档
 ```
 
 数据都在 `data/`：
@@ -252,3 +260,80 @@ scripts/          一次性工具（迁移/清理，默认干跑）
 **公众号抓取失败** — 用「设置 → 文章抓取测试」单独试。返回「链接参数错误或已失效」说明链接本身无效；「正文过短」说明是图片型文章或需要验证。
 
 **看日志** — 前台运行时直接看终端输出。
+
+---
+
+## 致谢
+
+这个项目不是从零发明的。它的两个核心思路——**微信消息落成本地 Markdown** 和 **OneDrive 直连同步**——都来自别人的工作。这里明确记下来源。
+
+### WXLink — 微信侧思路的来源
+
+- **作者**：[nextcaicai](https://github.com/nextcaicai)
+- **仓库**：[nextcaicai/WXLink](https://github.com/nextcaicai/WXLink)
+- **协议**：MIT
+
+wxcollector 对 iLink 协议的理解直接受益于 WXLink。它验证了「腾讯 iLink 网关可以合法接收个人微信消息」这条路，并且在下面这些细节上趟过了坑，我照着做省了大量试错：
+
+- 扫码 → `bot_token` → 长轮询 `getupdates` 的完整流程
+- 媒体文件是 AES-128-ECB 加密的，`aes_key` 有两种编码（16 字节原始 key 或 32 位 hex 字符串）
+- 语音是 SILK 格式，需要 `silk-wasm` 转 WAV
+- 公众号正文要取 `#js_content`，图片真实地址在 `data-src`，还要过滤「赞赏/点赞/在看」这类 UI 文字
+- 微信 CDN 的媒体链接会过期，必须收到就下载
+
+**WXLink 本身也是一个 fork**，上游是 [laruence/wechatian](https://github.com/laruence/wechatian)（同样 MIT）。所以这条思路上游其实是两代人：laruence 打了地基，nextcaicai 补了公众号抓取、语音兼容、扫码稳定性这些细节。
+
+### EasySync — OneDrive 侧思路的来源
+
+- **作者**：[jiaoyingxing](https://github.com/jiaoyingxing)
+- **仓库**：[jiaoyingxing/easy-sync](https://github.com/jiaoyingxing/easy-sync)
+- **协议**：MIT
+
+EasySync 证明了 Obsidian 插件可以**不依赖 OneDrive 客户端、直接连 Microsoft Graph**，而且能做到「用户什么都不用填，点一下就登录」。这两点直接塑造了 wxcollector 的 OneDrive 设计：
+
+- 用 OAuth 而不是让用户手动配同步目录
+- 把 `client_id` 写进代码，用户零配置（wxcollector 现在默认沿用 EasySync 的公开 `client_id`）
+- `Files.ReadWrite.AppFolder` 这个沙盒权限的存在，让我意识到「应用目录」和「任意文件夹」是两种不同的取舍
+
+它踩过的「不要和其他同步工具混用同一个目录，否则会回流」这个坑，也写进了 wxcollector 的文档里。
+
+### 协议实现参考
+
+- [sorrycc/wechatbot](https://github.com/sorrycc/wechatbot) — 写 iLink 客户端时参考了它对消息结构、CDN 解密、SILK 转码的处理方式。
+
+### 协议与平台
+
+- **iLink（智联）** — 腾讯官方的微信 Bot 接入协议，运行在 `ilinkai.weixin.qq.com`
+- **Microsoft Graph** — OneDrive 读写 API
+- **Azure AD 设备码流程（RFC 8628）** — 让无头服务器也能完成 OAuth 授权
+
+### 依赖
+
+[linkedom](https://github.com/WebReflection/linkedom)、[@mozilla/readability](https://github.com/mozilla/readability)、[turndown](https://github.com/mixmark-io/turndown)、[qrcode](https://github.com/soldair/node-qrcode)、[silk-wasm](https://github.com/idranme/silk-wasm)
+
+---
+
+## 和原作者的关系
+
+需要说明白：**wxcollector 不是这两个插件的 fork，是独立重写。**
+
+- 它不包含 WXLink 或 EasySync 的源代码，一行都没有复制
+- 运行环境完全不同：WXLink / EasySync 是 Obsidian 插件，跑在 Obsidian 里；wxcollector 是独立 Node 服务，不依赖 Obsidian
+- 交互形态不同：那两个是插件设置页，这个是独立 Web UI
+
+沿用的是**思路、协议知识和踩坑经验**，不是代码。这也是为什么上面要逐个列出「从中学到了什么」——思路来源同样值得署名。
+
+如果你只是想用现成的 Obsidian 方案，直接去用原作者的插件，它们更成熟、有社区支持、更新更及时：
+
+- 微信消息进 Obsidian → [WXLink](https://github.com/nextcaicai/WXLink)
+- Obsidian 库同步 OneDrive → [EasySync](https://github.com/jiaoyingxing/easy-sync)
+
+wxcollector 适合的场景是：**不想开 Obsidian，或者要把内容存到 Obsidian 库以外的地方。**
+
+---
+
+## 许可
+
+本项目采用 MIT 协议，与上述两个上游项目一致。
+
+如果你基于本项目二次开发，也请保留这份致谢——上游的贡献不该在传递中消失。
