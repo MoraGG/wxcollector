@@ -1,0 +1,23 @@
+{
+  "name": "wxcollector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "微信 ClawBot → 本地镜像 → OneDrive 的独立收集器，带 Web 管理界面",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "dev": "node --watch src/main.ts"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.18.11",
+    "qrcode": "^1.5.4",
+    "turndown": "^7.2.0"
+  },
+  "optionalDependencies": {
+    "silk-wasm": "^3.5.0"
+  }
+}
